@@ -5,6 +5,9 @@
             <v-toolbar-title>UMAP Options</v-toolbar-title>
             <v-spacer></v-spacer>
             <v-toolbar-items>
+                <div style="margin-right: 30px;">
+                    <v-checkbox v-model="relative_diff" label="Relative Difference" />
+                </div>
                 <div style="margin-right: 30px; width: 150px; margin-top: 5px;">
                     <v-text-field label="Specific ID" placeholder="Enter concept ID" variant="filled"
                         v-model="selected_id"></v-text-field>
@@ -17,8 +20,9 @@
                     <v-text-field label="Size" placeholder="Point size" variant="filled"
                         v-model="point_size"></v-text-field>
                 </div>
-                <div style="margin-right: 30px;">
-                    <v-checkbox v-model="use_energy" label="Energy" />
+                <div style="margin-right: 10px; margin-top: 5px; min-width: 150px;">
+                    <v-select v-model="scale_type" :items="Object.keys(scale_types)" label="Scaling type"
+                        variant="filled"></v-select>
                 </div>
             </v-toolbar-items>
         </v-toolbar>
@@ -29,18 +33,38 @@
         <v-card class="mt-2 pa-3 explanation-card">
             <v-card-title class="text-subtitle-1 font-weight-bold">Understanding the Visualization</v-card-title>
             <v-card-text class="text-body-2">
-                <p>This 2D UMAP projection visualizes the dictionary of SAE concepts extracted from vision-language
-                    models. Each point represents a concept vector (a linear direction in the shared embedding space).
+                <p>
+                    This 2D UMAP projection visualizes the dictionary of SAE concepts extracted from vision-language
+                    models.
+                    Each point represents a concept vector (a linear direction in the shared embedding space).
                     <b>UMAP preserves local distances</b>, so points close together in the visualization correspond to
-                    similar concepts in the original high-dimensional space, though larger-scale clusters should be
-                    interpreted cautiously.
+                    similar concepts in the original high-dimensional space,
+                    though larger-scale clusters should be interpreted cautiously.
                 </p>
+
+                <p>
+                    The <b>color gradient</b> spans from blue to orange, representing the energy difference between
+                    concepts in AI-generated images and real images.
+                    Specifically, we compute:
+                    <br />
+                    <code>diff = energy(concept on AI image) - energy(concept on real image)</code>
+                    <br />
+                    So a positive value (orange) indicates the concept is over-represented in AI content, while a
+                    negative value (blue) suggests under-representation.
+                </p>
+
+                <div class="d-flex align-center my-2">
+                    <span style="color: #65c7de; font-weight: bold;">AI under-represent</span>
+                    <div class="gradient-bar mx-2"></div>
+                    <span style="color: #e8b548; font-weight: bold;">AI over-represent</span>
+                    <span class="ml-2">(under → over represent)</span>
+                </div>
 
                 <p class="mt-3 mb-2"><b>Interact with concepts:</b></p>
                 <ul class="mb-2 pl-3">
                     <li><b>Click any point</b> to explore that concept's examples and properties</li>
                     <li>Use the <b>Specific ID</b> field to return to a concept by its identifier</li>
-                    <li>Check the <b>Co-Occurrence tab</b> to see how concepts Co-occurs together</li>
+                    <li>Check the <b>Co-Occurrence tab</b> to see how concepts co-occur together</li>
                 </ul>
 
                 <p class="mt-3 mb-2"><b>Concept metrics:</b></p>
@@ -55,14 +79,18 @@
                     </div>
                     <div class="mr-4 mb-2 d-flex flex-column align-center">
                         <v-chip color="indigo" size="small"><v-icon size="x-small">mdi-bridge</v-icon> 0.75</v-chip>
-                        <span class="caption mt-1">Co-occurence score</span>
+                        <span class="caption mt-1">Co-occurrence score</span>
+                    </div>
+                    <div class="mr-4 mb-2 d-flex flex-column align-center">
+                        <v-chip color="blue" size="small"><v-icon size="x-small">mdi-thermometer</v-icon> 3.2</v-chip>
+                        <span class="caption mt-1">Energy diff</span>
+                    </div>
+                    <div class="mr-4 mb-2 d-flex flex-column align-center">
+                        <v-chip color="blue" size="small"><v-icon size="x-small">mdi-thermometer-auto</v-icon>
+                            0.5</v-chip>
+                        <span class="caption mt-1">Relative energy diff</span>
                     </div>
                 </div>
-
-                <p class="mt-3"><b>Bridging modalities:</b> Although concepts are primarily unimodal (activating for
-                    either images or text), the Co-Occurrence tab reveals how the model creates cross-modal connections.
-                    These bridges allow concepts to fire together on aligned image-caption pairs, enabling the model to
-                    connect meaning across modalities even when individual concepts are specialized.</p>
             </v-card-text>
         </v-card>
 
@@ -95,6 +123,23 @@
                                     <v-icon>mdi-image-area</v-icon>
                                     {{ item.nb_fire }}
                                 </v-chip>
+                                <v-chip class="ma-2" :style="{
+                                    background: `rgba(${item.color_diff[0] * 255}, ${item.color_diff[1] * 255}, ${item.color_diff[2] * 255}, 1)`,
+                                    color: getTextColor(item.color_diff)
+                                }">
+                                    <v-icon>mdi-thermometer</v-icon>
+                                    {{ item.energy_diff.toFixed(3) }}
+                                </v-chip>
+
+                                <v-chip class="ma-2" :style="{
+                                    background: `rgba(${item.color_relative_diff[0] * 255}, ${item.color_relative_diff[1] * 255}, ${item.color_relative_diff[2] * 255}, 1)`,
+                                    color: getTextColor(item.color_relative_diff)
+                                }">
+                                    <v-icon>mdi-thermometer-auto</v-icon>
+                                    {{ item.relative_energy_diff.toFixed(3) }}
+                                </v-chip>
+
+
                             </v-card-title>
                             <v-card-text>
                                 <v-row>
@@ -145,7 +190,7 @@
 <script setup>
 import * as d3 from 'd3';
 import { onMounted, ref, watch } from 'vue';
-import dataDino from '@/assets/dinovision_website_data.json'
+import dataDino from '@/assets/diff_data_website.json'
 import { clamp } from '@/assets/math_utils';
 
 // props
@@ -153,6 +198,12 @@ const props = defineProps({
     width: { type: Number, default: 1560 },
     height: { type: Number, default: 800 },
 });
+
+const scale_types = {
+    'IN1K': 'scale',
+    'Diff': 'energy_diff',
+    'Relative Diff': 'relative_energy_diff',
+};
 
 // reactive state
 const chart_container = ref(null);
@@ -165,6 +216,8 @@ const compact_image = ref(false);
 const selected_id = ref(null);
 const active_tab = ref("selected");
 const co_occurring_concepts = ref([]);
+const relative_diff = ref(true);
+const scale_type = ref('IN1K');
 
 // initial data
 let data = dataDino
@@ -175,9 +228,9 @@ let canvas, context, x_scale, y_scale, zoom;
 // constants
 const CONCEPTS_IDS = Array.from({ length: 32000 }, (_, i) => i);
 const ORIGINAL_OPACITY = 0.8;
-const CLICK_COLOR = '#8e51ff';
-const HOVER_COLOR = '#a684ff';
-const SELECTED_COLOR = '#a684ff';
+const CLICK_COLOR = '#00c950';
+const HOVER_COLOR = '#05df72';
+const SELECTED_COLOR = HOVER_COLOR
 const STROKE_COLOR = 'rgba(71, 85, 105, 0.5)';
 const DEFAULT_SIZE = 10.0;
 const MIN_RADIUS = 0.5;
@@ -194,6 +247,11 @@ function create_dataset(source_data) {
     const energies = CONCEPTS_IDS.map(i => source_data.energy[i]);
     const max_energy = Math.max(...energies);
 
+    const max_diff = Math.max(...CONCEPTS_IDS.map(i => Math.abs(source_data.energy_diff[i])));
+
+    const mean_relative_diff = CONCEPTS_IDS.reduce((acc, i) => acc + Math.abs(source_data.relative_energy_diff[i]), 0) / CONCEPTS_IDS.length;
+    const std_relative_diff = Math.sqrt(CONCEPTS_IDS.reduce((acc, i) => acc + Math.pow(source_data.relative_energy_diff[i] - mean_relative_diff, 2), 0) / CONCEPTS_IDS.length);
+
     CONCEPTS_IDS.forEach(i => {
         result.push({
             id: i,
@@ -206,10 +264,23 @@ function create_dataset(source_data) {
             links_value: source_data.connections_val[i],
             is_dead: Number(source_data.is_dead[i]),
             nb_fire: Number(source_data.nb_fire[i]),
+            energy_diff: Number(source_data.energy_diff[i]) / max_diff,
+            relative_energy_diff: ((Number(source_data.relative_energy_diff[i]) - mean_relative_diff) / std_relative_diff) * 0.1,
+            color_diff: [source_data.color_diff[i][0], source_data.color_diff[i][1], source_data.color_diff[i][2], 1.0],
+            color_relative_diff: [source_data.color_relative_diff[i][0], source_data.color_relative_diff[i][1], source_data.color_relative_diff[i][2], 1.0],
         });
     });
 
     return result;
+}
+
+function getTextColor(rgbArray) {
+    const r = rgbArray[0] * 255;
+    const g = rgbArray[1] * 255;
+    const b = rgbArray[2] * 255;
+    // Perceived luminance (ITU-R BT.709)
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return luminance > 128 ? 'black' : 'white';
 }
 
 // initialize dataset
@@ -218,9 +289,14 @@ const dataset = create_dataset(data);
 // get radius based on energy and zoom
 function get_radius(d, transform) {
     let radius = 1;
-    if (use_energy.value) {
-        radius = Number(d.scale) ** 0.5 * DEFAULT_SIZE;
+    if (scale_type.value === 'Diff') {
+        radius = d.energy_diff;
+    } else if (scale_type.value === 'Relative Diff') {
+        radius = d.relative_energy_diff;
+    } else if (scale_type.value === 'IN1K') {
+        radius = d.scale;
     }
+    radius = Math.abs(Number(radius)) ** 0.5 * DEFAULT_SIZE;
     radius *= transform.k ** 0.8;
     radius = clamp(radius, MIN_RADIUS, MAX_RADIUS);
     radius *= point_size.value;
@@ -304,7 +380,13 @@ function draw(transform) {
         const radius = get_radius(d, transform);
 
         const color_mult = 255;
-        let color = "rgba(" + d.color.map(c => c * color_mult).join(",") + ")";
+        let color = `rgba(${d.color[0] * color_mult}, ${d.color[1] * color_mult}, ${d.color[2] * color_mult}, 1.0)`;
+        //let color = "rgba(" + d.color.map(c => c * color_mult).join(",") + ")";
+        if (relative_diff.value) {
+            color = `rgba(${d.color_relative_diff[0] * color_mult}, ${d.color_relative_diff[1] * color_mult}, ${d.color_relative_diff[2] * color_mult}, 1.0)`;
+        } else {
+            color = `rgba(${d.color_diff[0] * color_mult}, ${d.color_diff[1] * color_mult}, ${d.color_diff[2] * color_mult}, 1.0)`;
+        }
         let opacity = ORIGINAL_OPACITY;
 
         if (d.id === current_clicked_id) {
@@ -447,6 +529,14 @@ function find_nearest_points(target, dist) {
 
 // watch for display option changes
 watch(use_energy, () => {
+    if (canvas) draw(d3.zoomTransform(canvas));
+});
+
+watch(relative_diff, () => {
+    if (canvas) draw(d3.zoomTransform(canvas));
+});
+
+watch(scale_type, () => {
     if (canvas) draw(d3.zoomTransform(canvas));
 });
 

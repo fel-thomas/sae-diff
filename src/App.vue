@@ -6,7 +6,7 @@
                 style="max-height: 40px; margin-left: 15px" />
 
             <v-app-bar-title class="text-h5 font-weight-bold">
-                <v-app-bar-title>DINO<b>Vision</b></v-app-bar-title>
+                <v-app-bar-title>SAE<b>Diff</b></v-app-bar-title>
                 <v-spacer></v-spacer>
             </v-app-bar-title>
 
@@ -33,9 +33,11 @@
         </v-main>
 
         <!-- Footer -->
-        <v-footer app absolute class="text-caption text-disabled">
-            <span>&copy; {{ new Date().getFullYear() }} DINO<b>Vision</b></span>
+        <v-footer app absolute class="">
+            <span>&copy; {{ new Date().getFullYear() }} SAE<b>Diff</b></span>
             <v-spacer></v-spacer>
+            <span><a href="https://www.matyasbohacek.com">Maty(as) Bohacek</a> @ Stanford University</span>
+            <span style="margin-left: 10px; margin-right: 10px;">|</span>
             <span><a href="https://thomasfel.me">Thomas Fel</a> @ Kempner Institute, Harvard University</span>
         </v-footer>
     </v-app>

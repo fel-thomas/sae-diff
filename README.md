@@ -11,5 +11,9 @@
   "connections_idx": [[float, ...], ...], // Co-occuring concepts
   "connections_val": [[float, ...], ...], // Strength of co-occurence connections
   "nb_fire": [int, ...]                 , // Number of time a concept fire
+  "energy_diff": [float, ...]           , // Difference of energy the given concept
+  "relative_energy_diff": [float, ...]  , // Relative difference of energy (diff / (energy a + energy b))
+  "color_diff": [[r, g, b], ...]        , // Cmap color for energy diff
+  "color_relative_diff": [[r, g, b], ...] , // Cmap color for relative energy diff
 }
 ```
