@@ -190,7 +190,7 @@
 <script setup>
 import * as d3 from 'd3';
 import { onMounted, ref, watch } from 'vue';
-import dataDino from '@/assets/diff_data_website.json'
+import dataDino from '@/assets/diff_data_website_sample10k_SD21__enriched.json'
 import { clamp } from '@/assets/math_utils';
 
 // props
@@ -268,6 +268,8 @@ function create_dataset(source_data) {
             relative_energy_diff: ((Number(source_data.relative_energy_diff[i]) - mean_relative_diff) / std_relative_diff) * 0.1,
             color_diff: [source_data.color_diff[i][0], source_data.color_diff[i][1], source_data.color_diff[i][2], 1.0],
             color_relative_diff: [source_data.color_relative_diff[i][0], source_data.color_relative_diff[i][1], source_data.color_relative_diff[i][2], 1.0],
+            top_ai_image: source_data.top_ai_image[i],
+            top_original_image: source_data.top_original_image[i],
         });
     });
 
