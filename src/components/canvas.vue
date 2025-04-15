@@ -119,91 +119,19 @@
                 <!-- selected tab -->
                 <v-window-item value="selected">
                     <v-card v-if="selected_point">
-                        <div v-for="item in selected_point" :key="item.id" class="data-card">
-                            <v-card-title>
-                                <v-chip :color="item.id == selected_point[0].id ? 'purple' : 'purple'" class="ma-2">
-                                    <v-icon>mdi-passport</v-icon>
-                                    {{ item.id }}
-                                </v-chip>
-                                <v-chip color="orange" class="ma-2">
-                                    <v-icon>mdi-image-area</v-icon>
-                                    {{ item.nb_fire }}
-                                </v-chip>
-                                <v-chip class="ma-2" :style="{
-                                    background: `rgba(${item.color_diff[0] * 255}, ${item.color_diff[1] * 255}, ${item.color_diff[2] * 255}, 1)`,
-                                    color: getTextColor(item.color_diff)
-                                }">
-                                    <v-icon>mdi-thermometer</v-icon>
-                                    {{ item.energy_diff.toFixed(3) }}
-                                </v-chip>
-
-                                <v-chip class="ma-2" :style="{
-                                    background: `rgba(${item.color_relative_diff[0] * 255}, ${item.color_relative_diff[1] * 255}, ${item.color_relative_diff[2] * 255}, 1)`,
-                                    color: getTextColor(item.color_relative_diff)
-                                }">
-                                    <v-icon>mdi-thermometer-auto</v-icon>
-                                    {{ item.relative_energy_diff.toFixed(3) }}
-                                </v-chip>
-                            </v-card-title>
-                            <v-card-text>
-                                <v-row>
-                                    <v-col cols="12">
-                                        <v-img
-                                            :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
-                                            :class="{ 'compact': compact_image }"
-                                            lazy-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' height='500' width='500'%3E%3C/svg%3E"
-                                            :alt="`Concept ${item.id}`">
-                                            <template v-slot:placeholder>
-                                                <v-row class="fill-height ma-0" align="center" justify="center">
-                                                    <v-progress-circular indeterminate
-                                                        color="grey-lighten-5"></v-progress-circular>
-                                                </v-row>
-                                            </template>
-                                        </v-img>
-                                    </v-col>
-                                </v-row>
-                            </v-card-text>
-                        </div>
+                        <ConceptItem v-for="(item, index) in selected_point" :key="item.id" :concept="item"
+                            :model-key="model_to_key[data_source]" :is-current-concept="index === 0"
+                            :compact="compact_image" :show-examples="true" />
                     </v-card>
                 </v-window-item>
 
                 <!-- co-occurrence tab -->
                 <v-window-item value="cooccurrence">
                     <v-card v-if="co_occurring_concepts.length > 0">
-                        <div v-for="item in co_occurring_concepts" :key="item.id" class="data-card">
-                            <v-card-title>
-                                <v-chip :color="item.id == selected_point[0].id ? 'black' : 'blue-grey'" class="ma-2">
-                                    <v-icon>mdi-passport</v-icon>
-                                    {{ item.id }}
-                                </v-chip>
-                                <v-chip color="orange" class="ma-2">
-                                    <v-icon>mdi-image-area</v-icon>
-                                    {{ item.nb_fire }}
-                                </v-chip>
-                                <v-chip color="indigo" class="ma-2">
-                                    <v-icon>mdi-bridge</v-icon>
-                                    {{ item.links_value }}
-                                </v-chip>
-                            </v-card-title>
-                            <v-card-text>
-                                <v-row>
-                                    <v-col cols="12">
-                                        <v-img
-                                            :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
-                                            :class="{ 'compact': compact_image }"
-                                            lazy-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' height='500' width='500'%3E%3C/svg%3E"
-                                            :alt="`Concept ${item.id}`">
-                                            <template v-slot:placeholder>
-                                                <v-row class="fill-height ma-0" align="center" justify="center">
-                                                    <v-progress-circular indeterminate
-                                                        color="grey-lighten-5"></v-progress-circular>
-                                                </v-row>
-                                            </template>
-                                        </v-img>
-                                    </v-col>
-                                </v-row>
-                            </v-card-text>
-                        </div>
+                        <ConceptItem v-for="item in co_occurring_concepts" :key="item.id" :concept="item"
+                            :model-key="model_to_key[data_source]"
+                            :is-current-concept="item.id === selected_point?.[0]?.id" :compact="compact_image"
+                            :show-co-occurrence="true" :hide-energy-diff="true" :hide-relative-diff="true" />
                     </v-card>
                 </v-window-item>
 
@@ -225,50 +153,16 @@
 
                         <v-card-text>
                             <div v-if="topDifferenceConcepts.length > 0" class="top-diff-container">
-                                <div v-for="(item, index) in visibleTopDifferenceConcepts" :key="item.id"
-                                    class="data-card">
-                                    <v-card-title>
-                                        <div class="d-flex align-center">
-                                            <span class="rank-badge">{{ index + 1 }}</span>
-                                            <v-chip color="black" class="ma-2">
-                                                <v-icon>mdi-passport</v-icon>
-                                                {{ item.id }}
-                                            </v-chip>
-                                            <v-chip class="ma-2" :style="{
-                                                background: getDiffColor(item),
-                                                color: getTextColorForDiff(item)
-                                            }">
-                                                <v-icon>{{ getDiffIcon() }}</v-icon>
-                                                {{ getDiffValue(item).toFixed(3) }}
-                                            </v-chip>
-                                            <v-btn icon size="small" @click="onPointClick(item)">
-                                                <v-icon>mdi-magnify</v-icon>
-                                            </v-btn>
-                                        </div>
-                                    </v-card-title>
-                                    <v-card-text>
-                                        <v-row>
-                                            <v-col cols="12">
-                                                <v-img
-                                                    :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
-                                                    :class="{ 'compact': compact_image }"
-                                                    lazy-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' height='500' width='500'%3E%3C/svg%3E"
-                                                    :alt="`Concept ${item.id}`">
-                                                    <template v-slot:placeholder>
-                                                        <v-row class="fill-height ma-0" align="center" justify="center">
-                                                            <v-progress-circular indeterminate
-                                                                color="grey-lighten-5"></v-progress-circular>
-                                                        </v-row>
-                                                    </template>
-                                                </v-img>
-                                            </v-col>
-                                        </v-row>
-                                    </v-card-text>
-                                </div>
+                                <ConceptItem v-for="(item, index) in visibleTopDifferenceConcepts" :key="item.id"
+                                    :concept="item" :model-key="model_to_key[data_source]" :compact="compact_image"
+                                    :show-rank="true" :rank="index + 1" :show-magnify="true"
+                                    :hide-energy-diff="scale_type === 'Relative Diff'"
+                                    :hide-relative-diff="scale_type !== 'Relative Diff'"
+                                    @magnify-click="onPointClick" />
 
                                 <div v-if="topDifferenceConcepts.length > visibleTopDifferenceConcepts.length"
                                     class="text-center pa-4">
-                                    <v-btn @click="loadMoreTopDiff" color="black">
+                                    <v-btn @click="loadMoreTopDiff" color="primary">
                                         Load more
                                     </v-btn>
                                 </div>
@@ -288,6 +182,7 @@
 import * as d3 from 'd3';
 import { onMounted, ref, watch, computed } from 'vue';
 import { clamp } from '@/assets/math_utils';
+import ConceptItem from './conceptItem.vue';
 
 import dataKandisky from '@/assets/diff_data_website_sample10k_kandinsky__enriched.json';
 import dataPixart from '@/assets/diff_data_website_sample10k_pixart__enriched.json';
@@ -306,6 +201,13 @@ const model_data = {
     'Stable Diffusion 1.5': dataSD15,
     'Stable Diffusion 2.1': dataSD21,
 };
+
+const model_to_key = {
+    'Kandisky': 'kandinsky',
+    'Pixart': 'pixart',
+    'Stable Diffusion 1.5': 'SD15',
+    'Stable Diffusion 2.1': 'SD21',
+}
 
 const scale_types = {
     'IN1K': 'scale',
@@ -355,6 +257,9 @@ const MAX_RADIUS = 10000.0;
 let current_clicked_id = null;
 let current_selected_ids = [];
 let hovered_point_id = null;
+
+// Initialize dataset
+let dataset = create_dataset(data)
 
 // Computed for top differences
 const topDifferenceConcepts = computed(() => {
@@ -412,49 +317,18 @@ function create_dataset(source_data) {
             relative_energy_diff: ((Number(source_data.relative_energy_diff[i]) - mean_relative_diff) / std_relative_diff) * 0.1,
             color_diff: [source_data.color_diff[i][0], source_data.color_diff[i][1], source_data.color_diff[i][2], 1.0],
             color_relative_diff: [source_data.color_relative_diff[i][0], source_data.color_relative_diff[i][1], source_data.color_relative_diff[i][2], 1.0],
-            top_ai_image: source_data.top_ai_image[i],
-            top_original_image: source_data.top_original_image[i],
+            top_ai_image: source_data.top_ai_image[i].split('/')[0].split('_')[1],
+            top_original_image: source_data.top_original_image[i].split('/')[0].split('_')[1],
         });
     });
 
     return result;
 }
 
-function getTextColor(rgbArray) {
-    const r = rgbArray[0] * 255;
-    const g = rgbArray[1] * 255;
-    const b = rgbArray[2] * 255;
-    // Perceived luminance (ITU-R BT.709)
-    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    return luminance > 128 ? 'black' : 'white';
-}
-
-// New helper functions for top differences tab
-function getDiffValue(item) {
-    return scale_type.value === 'Relative Diff' ? item.relative_energy_diff : item.energy_diff;
-}
-
-function getDiffColor(item) {
-    const colorArray = scale_type.value === 'Relative Diff' ? item.color_relative_diff : item.color_diff;
-    return `rgba(${colorArray[0] * 255}, ${colorArray[1] * 255}, ${colorArray[2] * 255}, 1.0)`;
-}
-
-function getTextColorForDiff(item) {
-    const colorArray = scale_type.value === 'Relative Diff' ? item.color_relative_diff : item.color_diff;
-    return getTextColor(colorArray);
-}
-
-function getDiffIcon() {
-    return scale_type.value === 'Relative Diff' ? 'mdi-thermometer-auto' : 'mdi-thermometer';
-}
-
 // Function to load more items in the top differences tab
 function loadMoreTopDiff() {
     visible_top_diff_count.value = Math.min(visible_top_diff_count.value + 10, topDifferenceConcepts.value.length);
 }
-
-// Initialize dataset
-const dataset = create_dataset(data);
 
 // Get radius based on energy and zoom
 function get_radius(d, transform) {
@@ -718,12 +592,18 @@ watch(scale_type, () => {
 
 watch(data_source, () => {
     data = model_data[data_source.value];
-    // Remove the old dataset
-    // and create a new one
-    dataset.length = 0;
-    dataset.push(...create_dataset(data));
-    if (canvas) draw(d3.zoomTransform(canvas));
+
     resetVisibleTopDiff();
+    dataset = create_dataset(data);
+
+    // Reset selected values
+    selected_point.value = null;
+    current_clicked_id = null;
+    current_selected_ids = [];
+    co_occurring_concepts.value = [];
+
+    // Draw the new dataset
+    if (canvas) draw(d3.zoomTransform(canvas));
 });
 
 watch(diff_sort_order, resetVisibleTopDiff);
@@ -753,3 +633,71 @@ watch(dist_neighbours, () => {
 });
 
 </script>
+
+<style scoped>
+.chart-container {
+    border: 1px solid rgba(13, 13, 21, 0.3);
+    text-align: center;
+    overflow: hidden;
+    border-radius: 3px;
+    margin: auto;
+}
+
+.canvas-container {
+    padding: 20px;
+}
+
+.explanation-card {
+    font-size: 0.9em;
+    margin-top: 10px;
+}
+
+img.compact {
+    object-fit: cover;
+}
+
+img {
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
+}
+
+.v-responsive__sizer {
+    padding-bottom: 0 !important;
+}
+
+pre {
+    display: inline-block;
+    text-wrap: auto;
+    background-color: #e2e8f0;
+    border-radius: 2px;
+    padding: 10px;
+    overflow: hidden;
+    color: #020617;
+}
+
+.data-card {
+    transition: all 0.2s ease;
+    opacity: 0.8;
+    border: dashed 2px transparent;
+    margin: 3px;
+    border-radius: 3px;
+}
+
+.data-card:hover {
+    opacity: 1.0;
+    border-color: #cbd5e1;
+}
+
+.gradient-bar {
+    height: 12px;
+    width: 120px;
+    background: linear-gradient(to right, #65c7de, #5776b4, #582949, #b16243, #e8b548);
+    border-radius: 6px;
+}
+
+.caption {
+    font-size: 0.75rem;
+    color: rgba(0, 0, 0, 0.6);
+}
+</style>
