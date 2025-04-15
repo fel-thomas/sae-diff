@@ -5,6 +5,10 @@
             <v-toolbar-title>UMAP Options</v-toolbar-title>
             <v-spacer></v-spacer>
             <v-toolbar-items>
+                <div style="margin-right: 10px; margin-top: 5px; min-width: 150px;">
+                    <v-select v-model="data_source" :items="Object.keys(model_data)" label="Model"
+                        variant="filled"></v-select>
+                </div>
                 <div style="margin-right: 30px;">
                     <v-checkbox v-model="relative_diff" label="Relative Difference" />
                 </div>
@@ -65,6 +69,7 @@
                     <li><b>Click any point</b> to explore that concept's examples and properties</li>
                     <li>Use the <b>Specific ID</b> field to return to a concept by its identifier</li>
                     <li>Check the <b>Co-Occurrence tab</b> to see how concepts co-occur together</li>
+                    <li>Check the <b>Top Differences tab</b> to see concepts with the highest or lowest differences</li>
                 </ul>
 
                 <p class="mt-3 mb-2"><b>Concept metrics:</b></p>
@@ -107,6 +112,7 @@
             <v-tabs v-model="active_tab" bg-color="dark" dark>
                 <v-tab value="selected">Selected</v-tab>
                 <v-tab value="cooccurrence">Co-Occurrence</v-tab>
+                <v-tab value="top_diff">Top Differences</v-tab>
             </v-tabs>
 
             <v-window v-model="active_tab">
@@ -138,14 +144,22 @@
                                     <v-icon>mdi-thermometer-auto</v-icon>
                                     {{ item.relative_energy_diff.toFixed(3) }}
                                 </v-chip>
-
-
                             </v-card-title>
                             <v-card-text>
                                 <v-row>
                                     <v-col cols="12">
-                                        <img :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
-                                            :class="{ 'compact': compact_image }" />
+                                        <v-img
+                                            :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
+                                            :class="{ 'compact': compact_image }"
+                                            lazy-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' height='500' width='500'%3E%3C/svg%3E"
+                                            :alt="`Concept ${item.id}`">
+                                            <template v-slot:placeholder>
+                                                <v-row class="fill-height ma-0" align="center" justify="center">
+                                                    <v-progress-circular indeterminate
+                                                        color="grey-lighten-5"></v-progress-circular>
+                                                </v-row>
+                                            </template>
+                                        </v-img>
                                     </v-col>
                                 </v-row>
                             </v-card-text>
@@ -174,12 +188,95 @@
                             <v-card-text>
                                 <v-row>
                                     <v-col cols="12">
-                                        <img :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
-                                            :class="{ 'compact': compact_image }" />
+                                        <v-img
+                                            :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
+                                            :class="{ 'compact': compact_image }"
+                                            lazy-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' height='500' width='500'%3E%3C/svg%3E"
+                                            :alt="`Concept ${item.id}`">
+                                            <template v-slot:placeholder>
+                                                <v-row class="fill-height ma-0" align="center" justify="center">
+                                                    <v-progress-circular indeterminate
+                                                        color="grey-lighten-5"></v-progress-circular>
+                                                </v-row>
+                                            </template>
+                                        </v-img>
                                     </v-col>
                                 </v-row>
                             </v-card-text>
                         </div>
+                    </v-card>
+                </v-window-item>
+
+                <!-- top differences tab -->
+                <v-window-item value="top_diff">
+                    <v-card>
+                        <v-card-title class="d-flex align-center">
+                            <span>Top Differences</span>
+                            <v-spacer></v-spacer>
+                            <div style="width: 180px;">
+                                <v-select v-model="diff_sort_order" :items="diffSortOptions" label="Sort by"
+                                    variant="filled" density="compact"></v-select>
+                            </div>
+                            <div style="width: 100px; margin-left: 10px;">
+                                <v-select v-model="top_diff_count" :items="[10, 20, 50, 100]" label="Count"
+                                    variant="filled" density="compact"></v-select>
+                            </div>
+                        </v-card-title>
+
+                        <v-card-text>
+                            <div v-if="topDifferenceConcepts.length > 0" class="top-diff-container">
+                                <div v-for="(item, index) in visibleTopDifferenceConcepts" :key="item.id"
+                                    class="data-card">
+                                    <v-card-title>
+                                        <div class="d-flex align-center">
+                                            <span class="rank-badge">{{ index + 1 }}</span>
+                                            <v-chip color="black" class="ma-2">
+                                                <v-icon>mdi-passport</v-icon>
+                                                {{ item.id }}
+                                            </v-chip>
+                                            <v-chip class="ma-2" :style="{
+                                                background: getDiffColor(item),
+                                                color: getTextColorForDiff(item)
+                                            }">
+                                                <v-icon>{{ getDiffIcon() }}</v-icon>
+                                                {{ getDiffValue(item).toFixed(3) }}
+                                            </v-chip>
+                                            <v-btn icon size="small" @click="onPointClick(item)">
+                                                <v-icon>mdi-magnify</v-icon>
+                                            </v-btn>
+                                        </div>
+                                    </v-card-title>
+                                    <v-card-text>
+                                        <v-row>
+                                            <v-col cols="12">
+                                                <v-img
+                                                    :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + item.id + '.webp'"
+                                                    :class="{ 'compact': compact_image }"
+                                                    lazy-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' height='500' width='500'%3E%3C/svg%3E"
+                                                    :alt="`Concept ${item.id}`">
+                                                    <template v-slot:placeholder>
+                                                        <v-row class="fill-height ma-0" align="center" justify="center">
+                                                            <v-progress-circular indeterminate
+                                                                color="grey-lighten-5"></v-progress-circular>
+                                                        </v-row>
+                                                    </template>
+                                                </v-img>
+                                            </v-col>
+                                        </v-row>
+                                    </v-card-text>
+                                </div>
+
+                                <div v-if="topDifferenceConcepts.length > visibleTopDifferenceConcepts.length"
+                                    class="text-center pa-4">
+                                    <v-btn @click="loadMoreTopDiff" color="black">
+                                        Load more
+                                    </v-btn>
+                                </div>
+                            </div>
+                            <div v-else class="text-center pa-4">
+                                No data available
+                            </div>
+                        </v-card-text>
                     </v-card>
                 </v-window-item>
             </v-window>
@@ -189,15 +286,26 @@
 
 <script setup>
 import * as d3 from 'd3';
-import { onMounted, ref, watch } from 'vue';
-import dataDino from '@/assets/diff_data_website_sample10k_SD21__enriched.json'
+import { onMounted, ref, watch, computed } from 'vue';
 import { clamp } from '@/assets/math_utils';
+
+import dataKandisky from '@/assets/diff_data_website_sample10k_kandinsky__enriched.json';
+import dataPixart from '@/assets/diff_data_website_sample10k_pixart__enriched.json';
+import dataSD15 from '@/assets/diff_data_website_sample10k_SD15__enriched.json';
+import dataSD21 from '@/assets/diff_data_website_sample10k_SD21__enriched.json';
 
 // props
 const props = defineProps({
     width: { type: Number, default: 1560 },
     height: { type: Number, default: 800 },
 });
+
+const model_data = {
+    'Kandisky': dataKandisky,
+    'Pixart': dataPixart,
+    'Stable Diffusion 1.5': dataSD15,
+    'Stable Diffusion 2.1': dataSD21,
+};
 
 const scale_types = {
     'IN1K': 'scale',
@@ -206,6 +314,7 @@ const scale_types = {
 };
 
 // reactive state
+const data_source = ref('Stable Diffusion 1.5');
 const chart_container = ref(null);
 const drawer = ref(false);
 const selected_point = ref(null);
@@ -217,15 +326,21 @@ const selected_id = ref(null);
 const active_tab = ref("selected");
 const co_occurring_concepts = ref([]);
 const relative_diff = ref(true);
-const scale_type = ref('IN1K');
+const scale_type = ref('Diff');
 
-// initial data
-let data = dataDino
+// New refs for top differences feature
+const diff_sort_order = ref('highest');
+const diffSortOptions = ['highest', 'lowest'];
+const top_diff_count = ref(20);
+const visible_top_diff_count = ref(10);
 
-// canvas vars
+// Initial data
+let data = model_data[data_source.value];
+
+// Canvas vars
 let canvas, context, x_scale, y_scale, zoom;
 
-// constants
+// Constants
 const CONCEPTS_IDS = Array.from({ length: 32000 }, (_, i) => i);
 const ORIGINAL_OPACITY = 0.8;
 const CLICK_COLOR = '#00c950';
@@ -236,12 +351,41 @@ const DEFAULT_SIZE = 10.0;
 const MIN_RADIUS = 0.5;
 const MAX_RADIUS = 10000.0;
 
-// state tracking
+// State tracking
 let current_clicked_id = null;
 let current_selected_ids = [];
 let hovered_point_id = null;
 
-// dataset creation function
+// Computed for top differences
+const topDifferenceConcepts = computed(() => {
+    if (!dataset || dataset.length === 0) return [];
+
+    const activeDataset = dataset.filter(d => d.is_dead === 0);
+    let sorted = [...activeDataset];
+
+    // Sort by the appropriate diff value
+    if (scale_type.value === 'Relative Diff') {
+        if (diff_sort_order.value === 'highest') {
+            sorted = sorted.sort((a, b) => b.relative_energy_diff - a.relative_energy_diff);
+        } else {
+            sorted = sorted.sort((a, b) => a.relative_energy_diff - b.relative_energy_diff);
+        }
+    } else {
+        if (diff_sort_order.value === 'highest') {
+            sorted = sorted.sort((a, b) => b.energy_diff - a.energy_diff);
+        } else {
+            sorted = sorted.sort((a, b) => a.energy_diff - b.energy_diff);
+        }
+    }
+
+    return sorted.slice(0, top_diff_count.value);
+});
+
+const visibleTopDifferenceConcepts = computed(() => {
+    return topDifferenceConcepts.value.slice(0, visible_top_diff_count.value);
+});
+
+// Dataset creation function
 function create_dataset(source_data) {
     const result = [];
     const energies = CONCEPTS_IDS.map(i => source_data.energy[i]);
@@ -285,10 +429,34 @@ function getTextColor(rgbArray) {
     return luminance > 128 ? 'black' : 'white';
 }
 
-// initialize dataset
+// New helper functions for top differences tab
+function getDiffValue(item) {
+    return scale_type.value === 'Relative Diff' ? item.relative_energy_diff : item.energy_diff;
+}
+
+function getDiffColor(item) {
+    const colorArray = scale_type.value === 'Relative Diff' ? item.color_relative_diff : item.color_diff;
+    return `rgba(${colorArray[0] * 255}, ${colorArray[1] * 255}, ${colorArray[2] * 255}, 1.0)`;
+}
+
+function getTextColorForDiff(item) {
+    const colorArray = scale_type.value === 'Relative Diff' ? item.color_relative_diff : item.color_diff;
+    return getTextColor(colorArray);
+}
+
+function getDiffIcon() {
+    return scale_type.value === 'Relative Diff' ? 'mdi-thermometer-auto' : 'mdi-thermometer';
+}
+
+// Function to load more items in the top differences tab
+function loadMoreTopDiff() {
+    visible_top_diff_count.value = Math.min(visible_top_diff_count.value + 10, topDifferenceConcepts.value.length);
+}
+
+// Initialize dataset
 const dataset = create_dataset(data);
 
-// get radius based on energy and zoom
+// Get radius based on energy and zoom
 function get_radius(d, transform) {
     let radius = 1;
     if (scale_type.value === 'Diff') {
@@ -305,10 +473,10 @@ function get_radius(d, transform) {
     return radius;
 }
 
-// init on mount
+// Init on mount
 onMounted(() => create_chart());
 
-// create chart and set up events
+// Create chart and set up events
 function create_chart() {
     chart_container.value.innerHTML = '';
 
@@ -351,7 +519,7 @@ function create_chart() {
     draw(d3.zoomIdentity);
 }
 
-// draw single point
+// Draw single point
 function draw_point(x, y, radius, color, opacity) {
     context.beginPath();
     context.arc(x, y, radius, 0, 2 * Math.PI);
@@ -360,7 +528,7 @@ function draw_point(x, y, radius, color, opacity) {
     context.fill();
 }
 
-// main drawing function
+// Main drawing function
 function draw(transform) {
     context.fillStyle = 'white';
     context.clearRect(0, 0, props.width, props.height);
@@ -373,7 +541,7 @@ function draw(transform) {
     const hovered_points = [];
     const other_points = [];
 
-    // collect points by type
+    // Collect points by type
     dataset.forEach(d => {
         if (d.is_dead !== 0) return;
 
@@ -383,7 +551,6 @@ function draw(transform) {
 
         const color_mult = 255;
         let color = `rgba(${d.color[0] * color_mult}, ${d.color[1] * color_mult}, ${d.color[2] * color_mult}, 1.0)`;
-        //let color = "rgba(" + d.color.map(c => c * color_mult).join(",") + ")";
         if (relative_diff.value) {
             color = `rgba(${d.color_relative_diff[0] * color_mult}, ${d.color_relative_diff[1] * color_mult}, ${d.color_relative_diff[2] * color_mult}, 1.0)`;
         } else {
@@ -408,10 +575,10 @@ function draw(transform) {
         }
     });
 
-    // draw regular points first
+    // Draw regular points first
     other_points.forEach(p => draw_point(p.x, p.y, p.radius, p.color, p.opacity));
 
-    // draw connections
+    // Draw connections
     if (co_occurring_concepts.value.length > 0 && clicked_point) {
         const x2 = clicked_point.x;
         const y2 = clicked_point.y;
@@ -434,7 +601,7 @@ function draw(transform) {
         });
     }
 
-    // draw highlighted points on top
+    // Draw highlighted points on top
     selected_points.forEach(p => draw_point(p.x, p.y, p.radius, p.color, p.opacity));
     hovered_points.forEach(p => draw_point(p.x, p.y, p.radius, p.color, p.opacity));
     if (clicked_point) {
@@ -442,12 +609,12 @@ function draw(transform) {
     }
 }
 
-// handle zoom
+// Handle zoom
 function handle_zoom(event) {
     draw(event.transform);
 }
 
-// handle mouse movement
+// Handle mouse movement
 function handle_mouse_move(event) {
     const transform = d3.zoomTransform(canvas);
     const [mouse_x, mouse_y] = d3.pointer(event);
@@ -477,24 +644,25 @@ function handle_mouse_move(event) {
     }
 }
 
-// handle click
+// Handle click
 function handle_click(event) {
     if (hovered_point_id !== null) {
         const clicked_point = dataset.find(d => d.id === hovered_point_id);
         if (clicked_point) {
-            on_point_click(clicked_point);
+            onPointClick(clicked_point);
         }
     }
 }
 
-// process point click
-function on_point_click(point) {
+// Process point click
+function onPointClick(point) {
     current_clicked_id = point.id;
     const neighbors = find_nearest_points(point, dist_neighbours.value);
     current_selected_ids = neighbors.map(d => d.id);
 
     selected_point.value = neighbors;
     drawer.value = true;
+    active_tab.value = "selected"; // Switch to selected tab when clicking a point
 
     co_occurring_concepts.value = point.links.map((id, index) => {
         const linked_concept = dataset.find(d => d.id === id);
@@ -510,7 +678,7 @@ function on_point_click(point) {
     draw(d3.zoomTransform(canvas));
 }
 
-// find nearby points
+// Find nearby points
 function find_nearest_points(target, dist) {
     dist = Number(dist);
 
@@ -529,7 +697,12 @@ function find_nearest_points(target, dist) {
     return distances.map(obj => obj.point);
 }
 
-// watch for display option changes
+// Reset visible top diff count when changing sort order or model
+function resetVisibleTopDiff() {
+    visible_top_diff_count.value = 10;
+}
+
+// Watch for display option changes
 watch(use_energy, () => {
     if (canvas) draw(d3.zoomTransform(canvas));
 });
@@ -540,14 +713,28 @@ watch(relative_diff, () => {
 
 watch(scale_type, () => {
     if (canvas) draw(d3.zoomTransform(canvas));
+    resetVisibleTopDiff();
 });
 
-// watch for selected id
+watch(data_source, () => {
+    data = model_data[data_source.value];
+    // Remove the old dataset
+    // and create a new one
+    dataset.length = 0;
+    dataset.push(...create_dataset(data));
+    if (canvas) draw(d3.zoomTransform(canvas));
+    resetVisibleTopDiff();
+});
+
+watch(diff_sort_order, resetVisibleTopDiff);
+watch(top_diff_count, resetVisibleTopDiff);
+
+// Watch for selected id
 watch(selected_id, () => {
     if (selected_id.value !== null && selected_id.value !== '') {
         const found_point = dataset.find(d => d.id === Number(selected_id.value));
         if (found_point) {
-            on_point_click(found_point);
+            onPointClick(found_point);
         } else {
             selected_point.value = null;
             current_clicked_id = null;
@@ -557,79 +744,12 @@ watch(selected_id, () => {
     }
 });
 
-// watch for distance changes
+// Watch for distance changes
 watch(dist_neighbours, () => {
     if (current_clicked_id !== null) {
         const point = dataset.find(d => d.id === current_clicked_id);
-        if (point) on_point_click(point);
+        if (point) onPointClick(point);
     }
 });
+
 </script>
-
-<style scoped>
-.chart-container {
-    border: 1px solid rgba(13, 13, 21, 0.3);
-    text-align: center;
-    overflow: hidden;
-    border-radius: 3px;
-    margin: auto;
-}
-
-.canvas-container {
-    padding: 20px;
-}
-
-.explanation-card {
-    font-size: 0.9em;
-    margin-top: 10px;
-}
-
-img.compact {
-    object-fit: cover;
-}
-
-img {
-    object-fit: contain;
-    width: 100%;
-    height: 100%;
-}
-
-.v-responsive__sizer {
-    padding-bottom: 0 !important;
-}
-
-pre {
-    display: inline-block;
-    text-wrap: auto;
-    background-color: #e2e8f0;
-    border-radius: 2px;
-    padding: 10px;
-    overflow: hidden;
-    color: #020617;
-}
-
-.data-card {
-    transition: all 0.2s ease;
-    opacity: 0.8;
-    border: dashed 2px transparent;
-    margin: 3px;
-    border-radius: 3px;
-}
-
-.data-card:hover {
-    opacity: 1.0;
-    border-color: #cbd5e1;
-}
-
-.gradient-bar {
-    height: 12px;
-    width: 120px;
-    background: linear-gradient(to right, #65c7de, #5776b4, #582949, #b16243, #e8b548);
-    border-radius: 6px;
-}
-
-.caption {
-    font-size: 0.75rem;
-    color: rgba(0, 0, 0, 0.6);
-}
-</style>
