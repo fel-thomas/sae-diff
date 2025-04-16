@@ -131,7 +131,8 @@
                         <ConceptItem v-for="item in co_occurring_concepts" :key="item.id" :concept="item"
                             :model-key="model_to_key[data_source]"
                             :is-current-concept="item.id === selected_point?.[0]?.id" :compact="compact_image"
-                            :show-co-occurrence="true" :hide-energy-diff="true" :hide-relative-diff="true" />
+                            :show-co-occurrence="true" :hide-energy-diff="true" :hide-relative-diff="true"
+                            :show-examples="true" />
                     </v-card>
                 </v-window-item>
 
@@ -157,12 +158,12 @@
                                     :concept="item" :model-key="model_to_key[data_source]" :compact="compact_image"
                                     :show-rank="true" :rank="index + 1" :show-magnify="true"
                                     :hide-energy-diff="scale_type === 'Relative Diff'"
-                                    :hide-relative-diff="scale_type !== 'Relative Diff'"
-                                    @magnify-click="onPointClick" />
+                                    :hide-relative-diff="scale_type !== 'Relative Diff'" @magnify-click="onPointClick"
+                                    :show-examples="true" />
 
                                 <div v-if="topDifferenceConcepts.length > visibleTopDifferenceConcepts.length"
                                     class="text-center pa-4">
-                                    <v-btn @click="loadMoreTopDiff" color="primary">
+                                    <v-btn @click="loadMoreTopDiff" color="black">
                                         Load more
                                     </v-btn>
                                 </div>
@@ -230,6 +231,9 @@ const co_occurring_concepts = ref([]);
 const relative_diff = ref(true);
 const scale_type = ref('Diff');
 
+// Make dataset reactive
+const dataset = ref([]);
+
 // New refs for top differences feature
 const diff_sort_order = ref('highest');
 const diffSortOptions = ['highest', 'lowest'];
@@ -259,13 +263,13 @@ let current_selected_ids = [];
 let hovered_point_id = null;
 
 // Initialize dataset
-let dataset = create_dataset(data)
+dataset.value = create_dataset(data);
 
 // Computed for top differences
 const topDifferenceConcepts = computed(() => {
-    if (!dataset || dataset.length === 0) return [];
+    if (!dataset.value || dataset.value.length === 0) return [];
 
-    const activeDataset = dataset.filter(d => d.is_dead === 0);
+    const activeDataset = dataset.value.filter(d => d.is_dead === 0);
     let sorted = [...activeDataset];
 
     // Sort by the appropriate diff value
@@ -374,11 +378,11 @@ function create_chart() {
     context.scale(pixel_ratio, pixel_ratio);
 
     x_scale = d3.scaleLinear()
-        .domain(d3.extent(dataset, d => d.x))
+        .domain(d3.extent(dataset.value, d => d.x))
         .range([0.0, props.width]);
 
     y_scale = d3.scaleLinear()
-        .domain(d3.extent(dataset, d => d.y))
+        .domain(d3.extent(dataset.value, d => d.y))
         .range([props.height - 1, 1]);
 
     zoom = d3.zoom()
@@ -416,7 +420,7 @@ function draw(transform) {
     const other_points = [];
 
     // Collect points by type
-    dataset.forEach(d => {
+    dataset.value.forEach(d => {
         if (d.is_dead !== 0) return;
 
         const x = transform.applyX(x_scale(d.x));
@@ -498,7 +502,7 @@ function handle_mouse_move(event) {
     let closest_point = null;
     let min_distance = Infinity;
 
-    dataset.forEach(d => {
+    dataset.value.forEach(d => {
         if (d.is_dead !== 0) return;
 
         const x = x_scale(d.x);
@@ -521,7 +525,7 @@ function handle_mouse_move(event) {
 // Handle click
 function handle_click(event) {
     if (hovered_point_id !== null) {
-        const clicked_point = dataset.find(d => d.id === hovered_point_id);
+        const clicked_point = dataset.value.find(d => d.id === hovered_point_id);
         if (clicked_point) {
             onPointClick(clicked_point);
         }
@@ -539,7 +543,7 @@ function onPointClick(point) {
     active_tab.value = "selected"; // Switch to selected tab when clicking a point
 
     co_occurring_concepts.value = point.links.map((id, index) => {
-        const linked_concept = dataset.find(d => d.id === id);
+        const linked_concept = dataset.value.find(d => d.id === id);
         if (linked_concept) {
             return {
                 ...linked_concept,
@@ -556,7 +560,7 @@ function onPointClick(point) {
 function find_nearest_points(target, dist) {
     dist = Number(dist);
 
-    let distances = dataset.map(d => {
+    let distances = dataset.value.map(d => {
         const dx = d.x - target.x;
         const dy = d.y - target.y;
         return { point: d, distance: Math.sqrt(dx * dx + dy * dy) };
@@ -594,7 +598,7 @@ watch(data_source, () => {
     data = model_data[data_source.value];
 
     resetVisibleTopDiff();
-    dataset = create_dataset(data);
+    dataset.value = create_dataset(data);
 
     // Reset selected values
     selected_point.value = null;
@@ -602,8 +606,12 @@ watch(data_source, () => {
     current_selected_ids = [];
     co_occurring_concepts.value = [];
 
-    // Draw the new dataset
-    if (canvas) draw(d3.zoomTransform(canvas));
+    // When dataset changes, we need to update the scales
+    if (canvas) {
+        x_scale.domain(d3.extent(dataset.value, d => d.x));
+        y_scale.domain(d3.extent(dataset.value, d => d.y));
+        draw(d3.zoomTransform(canvas));
+    }
 });
 
 watch(diff_sort_order, resetVisibleTopDiff);
@@ -612,7 +620,7 @@ watch(top_diff_count, resetVisibleTopDiff);
 // Watch for selected id
 watch(selected_id, () => {
     if (selected_id.value !== null && selected_id.value !== '') {
-        const found_point = dataset.find(d => d.id === Number(selected_id.value));
+        const found_point = dataset.value.find(d => d.id === Number(selected_id.value));
         if (found_point) {
             onPointClick(found_point);
         } else {
@@ -627,7 +635,7 @@ watch(selected_id, () => {
 // Watch for distance changes
 watch(dist_neighbours, () => {
     if (current_clicked_id !== null) {
-        const point = dataset.find(d => d.id === current_clicked_id);
+        const point = dataset.value.find(d => d.id === current_clicked_id);
         if (point) onPointClick(point);
     }
 });
