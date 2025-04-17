@@ -211,9 +211,9 @@ const model_to_key = {
 }
 
 const scale_types = {
-    'IN1K': 'scale',
-    'Diff': 'energy_diff',
     'Relative Diff': 'relative_energy_diff',
+    'Diff': 'energy_diff',
+    'IN1K': 'scale',
 };
 
 // reactive state
@@ -222,7 +222,7 @@ const chart_container = ref(null);
 const drawer = ref(false);
 const selected_point = ref(null);
 const use_energy = ref(true);
-const dist_neighbours = ref(1.0);
+const dist_neighbours = ref(5.0);
 const point_size = ref(1.0);
 const compact_image = ref(false);
 const selected_id = ref(null);
@@ -567,7 +567,9 @@ function find_nearest_points(target, dist) {
     });
 
     distances = distances.filter(obj => obj.distance <= dist * 0.05);
-    distances = distances.sort((a, b) => b.point.normalized_energy - a.point.normalized_energy);
+    // sort by relative diff absolute value
+    distances = distances.sort((a, b) => Math.abs(b.point.relative_energy_diff) - Math.abs(a.point.relative_energy_diff));
+    //distances = distances.sort((a, b) => b.point.normalized_energy - a.point.normalized_energy);
     distances = distances.filter(obj => obj.point.id != target.id);
     distances = distances.filter(obj => obj.point.is_dead == 0);
     distances.unshift({ point: target, distance: 0 });
