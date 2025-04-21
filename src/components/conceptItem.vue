@@ -39,6 +39,13 @@
         <v-btn v-if="showMagnify" icon size="small" @click="onMagnifyClick">
           <v-icon>mdi-magnify</v-icon>
         </v-btn>
+
+        <v-btn icon size="small" class="ml-2" @click="copyVisibleImage('base')">
+          <v-icon size="18">mdi-content-copy</v-icon>
+        </v-btn>
+        <v-btn icon size="small" class="ml-1" @click="copyVisibleImage('heatmap')">
+          <v-icon size="18">mdi-fire</v-icon>
+        </v-btn>
       </div>
     </v-card-title>
 
@@ -46,17 +53,17 @@
       <v-row>
         <!-- Main concept visualization -->
         <v-col cols="12">
-          <v-img
-            :src="'https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/top_heatmaps/' + concept.id + '.webp'"
-            :class="{ 'compact': compact }"
-            lazy-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' height='500' width='500'%3E%3C/svg%3E"
-            :alt="`Concept ${concept.id}`">
-            <template v-slot:placeholder>
-              <v-row class="fill-height ma-0" align="center" justify="center">
-                <v-progress-circular indeterminate color="grey-lighten-5"></v-progress-circular>
-              </v-row>
-            </template>
-          </v-img>
+          <div class="image-stack-container">
+            <div v-if="!baseLoaded || !heatmapLoaded" class="loading-overlay">
+              <v-progress-circular indeterminate color="primary" />
+            </div>
+
+            <img ref="baseImageRef" class="base-image" :src="imageUrl" crossorigin="anonymous"
+              @load="baseLoaded = true" />
+
+            <img ref="heatmapImageRef" class="heatmap-image" :src="heatmapUrl" :style="{ opacity }"
+              crossorigin="anonymous" @load="heatmapLoaded = true" />
+          </div>
         </v-col>
 
         <template v-if="showExamples">
@@ -146,7 +153,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 
 const props = defineProps({
   concept: {
@@ -192,10 +199,51 @@ const props = defineProps({
   showMagnify: {
     type: Boolean,
     default: false
-  }
+  },
+  opacity: {
+    type: Number,
+    default: 0.5
+  },
 });
 
 const emit = defineEmits(['magnify-click']);
+
+const imageUrl = `https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/${props.concept.id}_image.webp`;
+const heatmapUrl = `https://kempner-prod-thomasfel-storage.s3.amazonaws.com/dinov2/${props.concept.id}_heatmap.webp`;
+
+const baseImageRef = ref(null);
+const heatmapImageRef = ref(null);
+const baseLoaded = ref(false);
+const heatmapLoaded = ref(false);
+
+async function copyVisibleImage(type = 'base') {
+  await nextTick();
+
+  const imgEl = type === 'base' ? baseImageRef.value : heatmapImageRef.value;
+  if (!imgEl?.complete) {
+    console.warn('⛔ image not loaded yet');
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = imgEl.naturalWidth;
+  canvas.height = imgEl.naturalHeight;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(imgEl, 0, 0);
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob }),
+      ]);
+      console.log(`✅ ${type} image copied to clipboard`);
+    } catch (err) {
+      console.error('❌ clipboard write failed', err);
+    }
+  }, 'image/png');
+}
 
 // Helper functions to compute styles for chips
 const getTextColor = (rgbArray) => {
@@ -263,5 +311,61 @@ img {
   border-radius: 50%;
   font-size: 0.8rem;
   font-weight: bold;
+}
+
+.data-card {
+  transition: all 0.2s ease;
+  opacity: 0.9;
+  border: dashed 2px transparent;
+  margin: 3px;
+  border-radius: 3px;
+}
+
+.data-card:hover {
+  opacity: 1.0;
+  border-color: #cbd5e1;
+}
+
+.image-stack-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.image-stack-container img,
+.image-stack-container .v-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.base-image,
+.heatmap-image {
+  position: relative;
+  z-index: 1;
+}
+
+.base-image {
+  mix-blend-mode: normal;
+  filter: saturate(1.0) contrast(1.0);
+  transition: filter 0.2s ease;
+}
+
+.data-card:hover .base-image {
+  filter: saturate(1.1) contrast(1.1);
+}
+
+.heatmap-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: normal;
 }
 </style>

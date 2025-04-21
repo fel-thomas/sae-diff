@@ -20,13 +20,18 @@
                     <v-text-field label="Distance" placeholder="Distance to neighbours" variant="filled"
                         v-model="dist_neighbours"></v-text-field>
                 </div>
-                <div style="margin-right: 30px; width: 150px; margin-top: 5px;">
-                    <v-text-field label="Size" placeholder="Point size" variant="filled"
-                        v-model="point_size"></v-text-field>
-                </div>
                 <div style="margin-right: 10px; margin-top: 5px; min-width: 150px;">
                     <v-select v-model="scale_type" :items="Object.keys(scale_types)" label="Scaling type"
                         variant="filled"></v-select>
+                </div>
+                <div style="margin-right: 10px; width: 150px; margin-top:10px">
+                    <div class="text-caption">
+                        Heatmap Opacity
+                    </div>
+                    <v-slider v-model="global_heatmap_opacity" step="0.01" min="0" max="1" thumb-label></v-slider>
+                </div>
+                <div style="margin-right: 30px;">
+                    <v-checkbox v-model="auto_opacity_cycle" label="Auto Opacity" />
                 </div>
             </v-toolbar-items>
         </v-toolbar>
@@ -121,7 +126,7 @@
                     <v-card v-if="selected_point">
                         <ConceptItem v-for="(item, index) in selected_point" :key="item.id" :concept="item"
                             :model-key="model_to_key[data_source]" :is-current-concept="index === 0"
-                            :compact="compact_image" :show-examples="true" />
+                            :compact="compact_image" :show-examples="true" :opacity="global_heatmap_opacity" />
                     </v-card>
                 </v-window-item>
 
@@ -132,7 +137,7 @@
                             :model-key="model_to_key[data_source]"
                             :is-current-concept="item.id === selected_point?.[0]?.id" :compact="compact_image"
                             :show-co-occurrence="true" :hide-energy-diff="true" :hide-relative-diff="true"
-                            :show-examples="true" />
+                            :show-examples="true" :opacity="global_heatmap_opacity" />
                     </v-card>
                 </v-window-item>
 
@@ -159,7 +164,7 @@
                                     :show-rank="true" :rank="index + 1" :show-magnify="true"
                                     :hide-energy-diff="scale_type === 'Relative Diff'"
                                     :hide-relative-diff="scale_type !== 'Relative Diff'" @magnify-click="onPointClick"
-                                    :show-examples="true" />
+                                    :show-examples="true" :opacity="global_heatmap_opacity" />
 
                                 <div v-if="topDifferenceConcepts.length > visibleTopDifferenceConcepts.length"
                                     class="text-center pa-4">
@@ -222,7 +227,7 @@ const chart_container = ref(null);
 const drawer = ref(false);
 const selected_point = ref(null);
 const use_energy = ref(true);
-const dist_neighbours = ref(5.0);
+const dist_neighbours = ref(0.1);
 const point_size = ref(1.0);
 const compact_image = ref(false);
 const selected_id = ref(null);
@@ -230,6 +235,9 @@ const active_tab = ref("selected");
 const co_occurring_concepts = ref([]);
 const relative_diff = ref(true);
 const scale_type = ref('Diff');
+const auto_opacity_cycle = ref(false);
+let opacity_interval = null;
+const global_heatmap_opacity = ref(0.5);
 
 // Make dataset reactive
 const dataset = ref([]);
@@ -642,6 +650,20 @@ watch(dist_neighbours, () => {
     }
 });
 
+watch(auto_opacity_cycle, (enabled) => {
+    if (enabled) {
+        let t = 0;
+        opacity_interval = setInterval(() => {
+            // smoothly go 0 → 1 → 0 with a 3 sec period
+            t += 50;
+            const seconds = (t % 3000) / 3000;
+            global_heatmap_opacity.value = 0.5 * (1 + Math.sin(2 * Math.PI * seconds - Math.PI / 2)); // sine wave from 0 to 1
+        }, 50);
+    } else {
+        clearInterval(opacity_interval);
+        opacity_interval = null;
+    }
+});
 </script>
 
 <style scoped>
