@@ -2,8 +2,8 @@
     <v-app>
         <v-app-bar app elevation="2">
 
-            <img src="@/assets/images/dino_vision_logo.png" alt="DINO Vision" class="dinovision-logo"
-                style="max-height: 40px; margin-left: 15px" />
+            <img src="@/assets/images/logo.png" alt="DINO Vision" class="dinovision-logo"
+                style="max-height: 60px; margin-left: 15px" />
 
             <v-app-bar-title class="text-h5 font-weight-bold">
                 <v-app-bar-title>SAE<b>Diff</b></v-app-bar-title>
@@ -34,11 +34,14 @@
 
         <!-- Footer -->
         <v-footer app absolute class="">
-            <span>&copy; {{ new Date().getFullYear() }} SAE<b>Diff</b></span>
+            <span>&copy; {{ new Date().getFullYear() }} -- NeurIPS Submission</span>
             <v-spacer></v-spacer>
+            Anonymous authors
+            <!--
             <span><a href="https://www.matyasbohacek.com">Maty(as) Bohacek</a> @ Stanford University</span>
             <span style="margin-left: 10px; margin-right: 10px;">|</span>
             <span><a href="https://thomasfel.me">Thomas Fel</a> @ Kempner Institute, Harvard University</span>
+            -->
         </v-footer>
     </v-app>
 </template>
